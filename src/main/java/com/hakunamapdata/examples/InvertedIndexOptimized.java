@@ -81,12 +81,23 @@ public class InvertedIndexOptimized extends Configured implements Tool {
     @Override
     public int run(String[] args) throws Exception {
 
-        if (args.length != 2) {
-            System.out.printf("Usage: InvertedIndexOptimized <input dir> <output dir>\n");
+        if (args.length < 2) {
+            System.out.printf("Usage: InvertedIndexOptimized <input dir> <output dir> "
+                    + "[<profiler enabled>]\n");
             return -1;
         }
 
-        Job job = new Job(getConf());
+        Configuration conf = getConf();
+        
+        if ((args.length == 3) && (Boolean.parseBoolean(args[2]))) {
+            conf.setBoolean("mapred.task.profile", true);
+            conf.set("mapred.task.profile.params", "-agentlib:hprof=cpu=samples,"
+                    + "heap=sites,depth=6,force=n,thread=y,verbose=n,file=%s");
+            conf.set("mapred.task.profile.maps", "0");
+            conf.set("mapred.task.profile.reduces", "0");
+        }
+
+        Job job = new Job(conf);
         job.setJarByClass(InvertedIndexOptimized.class);
         job.setJobName("Inverted Index Optimized");
 
