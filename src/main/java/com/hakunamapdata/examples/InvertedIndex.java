@@ -19,14 +19,11 @@ import org.apache.hadoop.util.ToolRunner;
 public class InvertedIndex extends Configured implements Tool {
 
     public static class IndexMapper extends Mapper<LongWritable, Text, Text, Text> {
-
+        
         private String fileName = null;
 
         @Override
         public void setup(Context context) throws IOException, InterruptedException {
-            /*
-             * FileSplit for the input file provides access to the file's path.
-             */
             Path path = ((FileSplit) context.getInputSplit()).getPath();
             fileName = path.getName();
         }
@@ -36,13 +33,8 @@ public class InvertedIndex extends Configured implements Tool {
                 InterruptedException {
 
             String tokenPlace = fileName + "@" + key.get();
-            String lowerCasedLine = value.toString().toLowerCase();
 
-            /* 
-             * Split the line into words. For each word on the line,
-             * emit an output record that has the word as the key and
-             * the location of the word as the value. 
-             */
+            String lowerCasedLine = value.toString().toLowerCase();
             for (String token : lowerCasedLine.split("\\s")) {
                 if (token.length() > 0) {
                     context.write(new Text(token), new Text(tokenPlace));
@@ -53,8 +45,6 @@ public class InvertedIndex extends Configured implements Tool {
 
     public static class IndexReducer extends Reducer<Text, Text, Text, Text> {
 
-        private static final String SEP = ",";
-
         @Override
         public void reduce(Text key, Iterable<Text> values, Context context)
                 throws IOException, InterruptedException {
@@ -64,7 +54,7 @@ public class InvertedIndex extends Configured implements Tool {
             boolean firstValue = true;
             for (Text value : values) {
                 if (!firstValue) {
-                    valueList.append(SEP);
+                    valueList.append(Utils.COMMA);
                 }
 
                 firstValue = false;
@@ -79,19 +69,15 @@ public class InvertedIndex extends Configured implements Tool {
     public int run(String[] args) throws Exception {
 
         if (args.length < 2) {
-            System.out.printf("Usage: InvertedIndex <input dir> <output dir> "
-                    + "[<profiler enabled>]\n");
+            System.out.printf("Usage: InvertedIndex "
+                    + "<input dir> <output dir> [<profiler enabled>]\n");
             return -1;
         }
 
         Configuration conf = getConf();
 
         if ((args.length == 3) && (Boolean.parseBoolean(args[2]))) {
-            conf.setBoolean("mapred.task.profile", true);
-            conf.set("mapred.task.profile.params", "-agentlib:hprof=cpu=samples,"
-                    + "heap=sites,depth=6,force=n,thread=y,verbose=n,file=%s");
-            conf.set("mapred.task.profile.maps", "0");
-            conf.set("mapred.task.profile.reduces", "0");
+            Utils.enableProfiling(conf, "0", "0");
         }
 
         Job job = new Job(conf);
