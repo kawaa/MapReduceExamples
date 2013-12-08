@@ -1,7 +1,6 @@
 package com.hakunamapdata.examples;
 
 import java.io.IOException;
-import java.util.Date;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.mapreduce.lib.input.FileInputFormat;
@@ -18,23 +17,28 @@ import org.apache.hadoop.util.Tool;
 import org.apache.hadoop.util.ToolRunner;
 import org.apache.commons.lang3.StringUtils;
 
-public class InvertedIndexOptimized2 extends Configured implements Tool {
+public class InvertedIndexStringUtils extends Configured implements Tool {
 
     public static class IndexMapper extends Mapper<LongWritable, Text, Text, Text> {
 
         private Text location = new Text();
         private Text word = new Text();
+        private String fileName = null;
+
+        @Override
+        public void setup(Context context) throws IOException, InterruptedException {
+            /*
+             * FileSplit for the input file provides access to the file's path.
+             */
+            Path path = ((FileSplit) context.getInputSplit()).getPath();
+            fileName = path.getName();
+        }
 
         @Override
         public void map(LongWritable key, Text value, Context context) throws IOException,
                 InterruptedException {
 
-            /*
-             * FileSplit for the input file provides access to the file's path.
-             */
-            Path path = ((FileSplit) context.getInputSplit()).getPath();
-            String tokenPlace = path.getName() + "@" + key.get();
-
+            String tokenPlace = fileName + "@" + key.get();
             String lowerCasedLine = StringUtils.lowerCase(value.toString());
 
             /* 
@@ -70,14 +74,14 @@ public class InvertedIndexOptimized2 extends Configured implements Tool {
     @Override
     public int run(String[] args) throws Exception {
 
-      if (args.length < 2) {
-            System.out.printf("Usage: InvertedIndexOptimized2 <input dir> <output dir> "
+        if (args.length < 2) {
+            System.out.printf("Usage: InvertedIndexStringUtils <input dir> <output dir> "
                     + "[<profiler enabled>]\n");
             return -1;
         }
 
         Configuration conf = getConf();
-        
+
         if ((args.length == 3) && (Boolean.parseBoolean(args[2]))) {
             conf.setBoolean("mapred.task.profile", true);
             conf.set("mapred.task.profile.params", "-agentlib:hprof=cpu=samples,"
@@ -87,8 +91,8 @@ public class InvertedIndexOptimized2 extends Configured implements Tool {
         }
 
         Job job = new Job(conf);
-        job.setJarByClass(InvertedIndexOptimized2.class);
-        job.setJobName("Inverted Index Optimized2");
+        job.setJarByClass(InvertedIndexStringUtils.class);
+        job.setJobName("InvertedIndexStringUtils");
 
         FileInputFormat.setInputPaths(job, new Path(args[0]));
         FileOutputFormat.setOutputPath(job, new Path(args[1]));
@@ -104,7 +108,7 @@ public class InvertedIndexOptimized2 extends Configured implements Tool {
     }
 
     public static void main(String[] args) throws Exception {
-        int exitCode = ToolRunner.run(new Configuration(), new InvertedIndexOptimized2(), args);
+        int exitCode = ToolRunner.run(new Configuration(), new InvertedIndexStringUtils(), args);
         System.exit(exitCode);
     }
 }

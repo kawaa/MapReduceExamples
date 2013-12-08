@@ -1,7 +1,6 @@
 package com.hakunamapdata.examples;
 
 import java.io.IOException;
-import java.util.Date;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.mapreduce.lib.input.FileInputFormat;
@@ -21,16 +20,22 @@ public class InvertedIndex extends Configured implements Tool {
 
     public static class IndexMapper extends Mapper<LongWritable, Text, Text, Text> {
 
-        @Override
-        public void map(LongWritable key, Text value, Context context) throws IOException,
-                InterruptedException {
+        private String fileName = null;
 
+        @Override
+        public void setup(Context context) throws IOException, InterruptedException {
             /*
              * FileSplit for the input file provides access to the file's path.
              */
             Path path = ((FileSplit) context.getInputSplit()).getPath();
-            String tokenPlace = path.getName() + "@" + key.get();
+            fileName = path.getName();
+        }
 
+        @Override
+        public void map(LongWritable key, Text value, Context context) throws IOException,
+                InterruptedException {
+
+            String tokenPlace = fileName + "@" + key.get();
             String lowerCasedLine = value.toString().toLowerCase();
 
             /* 
@@ -54,15 +59,16 @@ public class InvertedIndex extends Configured implements Tool {
         public void reduce(Text key, Iterable<Text> values, Context context)
                 throws IOException, InterruptedException {
 
-            String valueList = "";
+            StringBuilder valueList = new StringBuilder();
+
             boolean firstValue = true;
             for (Text value : values) {
                 if (!firstValue) {
-                    valueList += SEP;
-                } else {
-                    firstValue = false;
+                    valueList.append(SEP);
                 }
-                valueList += value.toString();
+
+                firstValue = false;
+                valueList.append(value.toString());
             }
 
             context.write(key, new Text(valueList.toString()));
@@ -79,7 +85,7 @@ public class InvertedIndex extends Configured implements Tool {
         }
 
         Configuration conf = getConf();
-        
+
         if ((args.length == 3) && (Boolean.parseBoolean(args[2]))) {
             conf.setBoolean("mapred.task.profile", true);
             conf.set("mapred.task.profile.params", "-agentlib:hprof=cpu=samples,"

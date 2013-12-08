@@ -1,7 +1,6 @@
 package com.hakunamapdata.examples;
 
 import java.io.IOException;
-import java.util.Date;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.mapreduce.lib.input.FileInputFormat;
@@ -18,31 +17,37 @@ import org.apache.hadoop.util.Tool;
 import org.apache.hadoop.util.ToolRunner;
 import org.apache.commons.lang3.StringUtils;
 
-public class InvertedIndexOptimized extends Configured implements Tool {
+public class InvertedIndexVariablesReused extends Configured implements Tool {
 
     public static class IndexMapper extends Mapper<LongWritable, Text, Text, Text> {
 
         private Text location = new Text();
         private Text word = new Text();
+        private String fileName = null;
+
+        @Override
+        public void setup(Context context) throws IOException, InterruptedException {
+            /*
+             * FileSplit for the input file provides access to the file's path.
+             */
+            Path path = ((FileSplit) context.getInputSplit()).getPath();
+            fileName = path.getName();
+        }
 
         @Override
         public void map(LongWritable key, Text value, Context context) throws IOException,
                 InterruptedException {
 
-            /*
-             * FileSplit for the input file provides access to the file's path.
-             */
-            Path path = ((FileSplit) context.getInputSplit()).getPath();
-            String tokenPlace = path.getName() + "@" + key.get();
+            String tokenPlace = fileName + "@" + key.get();
 
-            String lowerCasedLine = StringUtils.lowerCase(value.toString());
+            String lowerCasedLine = value.toString().toLowerCase();
 
             /* 
              * Split the line into words. For each word on the line,
              * emit an output record that has the word as the key and
              * the location of the word as the value. 
              */
-            for (String token : StringUtils.split(lowerCasedLine, "\\s")) {
+            for (String token : lowerCasedLine.split("\\s")) {
                 if (token.length() > 0) {
                     word.set(token);
                     location.set(tokenPlace);
@@ -82,13 +87,13 @@ public class InvertedIndexOptimized extends Configured implements Tool {
     public int run(String[] args) throws Exception {
 
         if (args.length < 2) {
-            System.out.printf("Usage: InvertedIndexOptimized <input dir> <output dir> "
+            System.out.printf("Usage: InvertedIndexVariablesReused <input dir> <output dir> "
                     + "[<profiler enabled>]\n");
             return -1;
         }
 
         Configuration conf = getConf();
-        
+
         if ((args.length == 3) && (Boolean.parseBoolean(args[2]))) {
             conf.setBoolean("mapred.task.profile", true);
             conf.set("mapred.task.profile.params", "-agentlib:hprof=cpu=samples,"
@@ -98,8 +103,8 @@ public class InvertedIndexOptimized extends Configured implements Tool {
         }
 
         Job job = new Job(conf);
-        job.setJarByClass(InvertedIndexOptimized.class);
-        job.setJobName("Inverted Index Optimized");
+        job.setJarByClass(InvertedIndexVariablesReused.class);
+        job.setJobName("Inverted Index Variables Reused");
 
         FileInputFormat.setInputPaths(job, new Path(args[0]));
         FileOutputFormat.setOutputPath(job, new Path(args[1]));
@@ -115,7 +120,7 @@ public class InvertedIndexOptimized extends Configured implements Tool {
     }
 
     public static void main(String[] args) throws Exception {
-        int exitCode = ToolRunner.run(new Configuration(), new InvertedIndexOptimized(), args);
+        int exitCode = ToolRunner.run(new Configuration(), new InvertedIndexVariablesReused(), args);
         System.exit(exitCode);
     }
 }
